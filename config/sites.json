@@ -1,0 +1,44 @@
+[
+  {
+    "name": "OYA by Gemkara",
+    "client": "Gemkara",
+    "url": "https://oyabygemkara.com",
+    "form": {
+      "mode": "presence",
+      "url": "https://oyabygemkara.com/contact",
+      "expectText": "<form"
+    }
+  },
+  {
+    "name": "Nuform Tech",
+    "client": "Nuform",
+    "url": "https://nuformtech.com",
+    "domain": "nuformtech.com"
+  },
+  {
+    "name": "Example WordPress client",
+    "client": "Example Co",
+    "url": "https://example.com",
+    "form": {
+      "mode": "submit",
+      "url": "https://example.com/wp-json/contact-form-7/v1/contact-forms/123/feedback",
+      "method": "POST",
+      "type": "multipart",
+      "fields": {
+        "_wpcf7_unit_tag": "wpcf7-f123-o1",
+        "your-name": "Nuform Watchdog TEST",
+        "your-email": "watchdog@nuformsocial.com",
+        "your-subject": "Automated daily form test",
+        "your-message": "Automated daily test from Nuform. Please ignore."
+      },
+      "expectStatus": 200,
+      "expectText": "mail_sent"
+    }
+  },
+  {
+    "name": "Apotsa",
+    "client": "",
+    "url": "https://www.apotsa.com/",
+    "domain": "www.apotsa.com"
+  }
+]

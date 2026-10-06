@@ -1,0 +1,36 @@
+services:
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    container_name: uptime-kuma
+    restart: unless-stopped
+    ports:
+      - "3000:3001"          # Uptime Kuma UI -> http://localhost:3000
+    volumes:
+      - kuma-data:/app/data
+
+  watchdog:
+    build: ./app
+    container_name: watchdog
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      CONFIG_DIR: /config
+      DATA_DIR: /data
+      KUMA_URL: http://uptime-kuma:3001      # internal address used by "Sync to Uptime Kuma"
+      KUMA_UI_URL: http://localhost:3000     # shown in the dashboard instructions
+      KUMA_HOOK_BASE: http://watchdog:3001   # how Kuma reaches the watchdog
+    ports:
+      - "3001:3001"          # Watchdog dashboard -> http://localhost:3001
+    volumes:
+      - ./config:/config     # sites.json + oncall.json (edited from the dashboard; backups in config/backups)
+      - watchdog-data:/data  # state.json (results + alert log + history)
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3001/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  kuma-data:
+  watchdog-data:

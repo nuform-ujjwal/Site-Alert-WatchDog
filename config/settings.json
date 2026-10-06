@@ -1,0 +1,12 @@
+{
+  "alertRecipients": [
+    {
+      "name": "ujjwal",
+      "upn": "ujjwal@nuformsocial.com"
+    }
+  ],
+  "alertTargets": {
+    "group": false,
+    "personal": true
+  }
+}

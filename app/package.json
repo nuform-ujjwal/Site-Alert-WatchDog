@@ -1,0 +1,20 @@
+{
+  "name": "nuform-site-watchdog",
+  "version": "1.0.0",
+  "private": true,
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "check": "node -e \"require('dotenv').config({path:'../.env'});const{getSites}=require('./src/store');require('./src/checks').runAll(getSites()).then(r=>console.log(JSON.stringify(r,null,2)))\""
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "node-cron": "^3.0.3",
+    "socket.io-client": "^4.8.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

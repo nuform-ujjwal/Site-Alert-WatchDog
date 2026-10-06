@@ -1,0 +1,623 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Site Watchdog user guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700&display=swap" rel="stylesheet"><style>
+:root{--bg:#F2F4F7;--surface:#fff;--ink:#142033;--muted:#58637A;--line:#DDE2EA;--accent:#3B4BD8}
+@media (prefers-color-scheme: dark){:root{--bg:#0F1623;--surface:#172033;--ink:#E8EDF6;--muted:#9AA6BD;--line:#26324A;--accent:#7C8BFF}}
+*{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.65 "Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",sans-serif}
+.wrap{max-width:860px;margin:0 auto;padding:28px 20px 80px}
+.bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}
+.btn{display:inline-block;padding:8px 14px;border-radius:8px;border:1px solid var(--accent);color:var(--accent);text-decoration:none;font-weight:600;font-size:14px}
+.btn.primary{background:var(--accent);color:#fff}
+h1{font-size:clamp(30px,5vw,42px);line-height:1.1;letter-spacing:-.025em;margin:6px 0 4px}
+h1+p{color:var(--muted);margin-top:0}
+h2{font-size:25px;letter-spacing:-.015em;margin:44px 0 8px;padding-top:12px;border-top:1px solid var(--line)}
+h3{font-size:19px;margin:28px 0 6px}
+p,li{max-width:72ch} a{color:var(--accent)}
+table{border-collapse:collapse;width:100%;margin:14px 0;font-size:14.5px;background:var(--surface);border:1px solid var(--line);display:block;overflow-x:auto}
+th,td{padding:8px 12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)} th{background:var(--bg);font-weight:650}
+code{font:13px ui-monospace,Menlo,Consolas,monospace;background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:1px 5px}
+pre{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow-x:auto} pre code{border:0;padding:0;background:none}
+.toc{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 24px;margin:18px 0}.toc ol{margin:6px 0;columns:2}
+@media (max-width:640px){.toc ol{columns:1}}
+@media print{body{background:#fff;color:#000;font-size:11pt}.bar,.toc{display:none}h2{break-after:avoid}table,pre{break-inside:avoid}.wrap{padding:0}a{color:#000}}
+</style></head><body><div class="wrap">
+<div class="bar"><a class="btn" href="/">Back to dashboard</a><a class="btn primary" href="Site-Watchdog-User-Guide.pdf" download>Download PDF</a><a class="btn" href="Site-Watchdog-User-Guide.md" download>Download Markdown</a></div>
+<nav class="toc" aria-label="Contents"><b>Contents</b><ol><li><a href="#1-what-it-does">What it does</a></li><li><a href="#2-signing-in">Signing in</a></li><li><a href="#3-the-dashboard-top-to-bottom">The dashboard, top to bottom</a></li><li><a href="#4-reading-a-site-row">Reading a site row</a></li><li><a href="#5-managing-sites">Managing sites</a></li><li><a href="#6-connecting-uptime-kuma">Connecting Uptime Kuma</a></li><li><a href="#7-the-daily-checks-and-what-the-results-mean">The daily checks and what the results mean</a></li><li><a href="#8-teams-alerts">Teams alerts</a></li><li><a href="#9-how-often-sites-are-rechecked-and-what-data-we-collect">How often sites are rechecked and what data we collect</a></li><li><a href="#10-live-updates">Live updates</a></li><li><a href="#11-where-things-are-stored">Where things are stored</a></li><li><a href="#12-troubleshooting">Troubleshooting</a></li><li><a href="#13-admin-notes">Admin notes</a></li><li><a href="#14-not-included-yet">Not included yet</a></li><li><a href="#15-glossary">Glossary</a></li></ol></nav><h1>Client Site Watchdog: User Guide</h1>
+<p>Nuform Social · T1 of the &quot;Tiny Blocks&quot; automation series</p>
+<p>This guide explains every feature in plain language. You do not need to be technical to use the dashboard. The last part (Admin notes) is for whoever looks after the server.</p>
+<h2 id="1-what-it-does">1. What it does</h2>
+<p>The watchdog keeps an eye on every client website and tells your team on Microsoft Teams when something is wrong. It does two jobs:</p>
+<ol>
+<li><strong>Outage watching, every 30 seconds.</strong> A free tool called <strong>Uptime Kuma</strong> opens each site over and over. If a site stops answering, the watchdog posts an alert in your Teams group chat and @mentions the person on call.</li>
+<li><strong>Daily health checks, every morning at 09:00 IST.</strong> The watchdog itself checks things that break quietly: the SSL certificate, the domain registration, whether Google is blocked from the site, whether the contact form works, how fast the homepage is, and a few extras.</li>
+</ol>
+<pre><code>Client websites
+      ^   every 30 seconds
+Uptime Kuma  ---- site is down ----&gt;  Watchdog  ----&gt;  Teams group chat
+                                         |                (@on-call, @always-alert)
+ daily at 09:00 IST ---------------------+
+ (SSL, domain, indexing, form, speed)    |
+                                         +----&gt;  Dashboard (http://localhost:3001)
+</code></pre>
+<p><strong>What is open source and what is custom</strong></p>
+<table>
+<thead>
+<tr>
+<th>Part</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Uptime Kuma (checks sites every 30 s)</td>
+<td>Open source, used as is</td>
+</tr>
+<tr>
+<td>Docker, Node.js, Express</td>
+<td>Open source</td>
+</tr>
+<tr>
+<td>RDAP / WHOIS (public domain databases)</td>
+<td>Public services</td>
+</tr>
+<tr>
+<td>The watchdog app: Teams cards, daily checks, dashboard, on-call rota, Kuma connection, login</td>
+<td>Custom, built for Nuform</td>
+</tr>
+</tbody></table>
+<h2 id="2-signing-in">2. Signing in</h2>
+<p>Open the dashboard at <strong><a href="http://localhost:3001">http://localhost:3001</a></strong> (or your server&#39;s address). If you are not signed in you land on the sign-in page.</p>
+<ul>
+<li>Sign in with your <strong>Uptime Kuma username and password</strong>. One account for both tools.</li>
+<li>The <code>nuform</code> login stored in the <code>.env</code> file (<code>DASH_USER</code> and <code>DASH_PASS</code>) also works. Use it if you forget the Kuma password.</li>
+<li>Use the <strong>eye icon</strong> in the password box to show or hide what you typed.</li>
+<li>You stay signed in for 7 days. <strong>Log out</strong> is in the top right.</li>
+<li>After 10 wrong attempts in a minute the page asks you to wait.</li>
+<li>If Uptime Kuma has no account yet, the sign-in page shows a button that opens Kuma so you can create one first.</li>
+</ul>
+<h2 id="3-the-dashboard-top-to-bottom">3. The dashboard, top to bottom</h2>
+<p><strong>Headline.</strong> One sentence that says whether everything is fine, how many sites need attention, or how many are down right now. The coloured bar beside it is green, amber or red. Underneath you see when the daily checks last ran.</p>
+<p><strong>On call now.</strong> Who is responsible this week. This name is used in Teams alerts.</p>
+<p><strong>Banner &quot;No Teams destination is switched on&quot;.</strong> Shows when no destination is switched on. <strong>Set up Teams</strong> opens the settings.</p>
+<p><strong>The five number boxes</strong></p>
+<table>
+<thead>
+<tr>
+<th>Box</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Average uptime, 30 days</td>
+<td>How much of the last 30 days your sites were up, averaged across sites</td>
+</tr>
+<tr>
+<td>Outages caught, 30 days</td>
+<td>How many times a site went down</td>
+</tr>
+<tr>
+<td>Average outage to alert</td>
+<td>Time from a site going down to the Teams alert being sent</td>
+</tr>
+<tr>
+<td>Expired SSL or domains now</td>
+<td>Sites whose certificate or domain has already expired</td>
+</tr>
+<tr>
+<td>Alerts that failed to reach Teams</td>
+<td>Alerts the watchdog could not deliver</td>
+</tr>
+</tbody></table>
+<p>Uptime and outage numbers come from Uptime Kuma. Until Kuma is connected they show a dash or zero.</p>
+<p><strong>The site list.</strong> One row per site. Use the filters <strong>All / Needs attention / Paused</strong>.</p>
+<h2 id="4-reading-a-site-row">4. Reading a site row</h2>
+<table>
+<thead>
+<tr>
+<th>Part of the row</th>
+<th>What it shows</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Coloured bar on the left</td>
+<td>Green: all good. Amber: warning. Red: a problem or the site is down. Dashed grey: paused</td>
+</tr>
+<tr>
+<td>Name and client</td>
+<td>Click the name to open the details panel</td>
+</tr>
+<tr>
+<td>30-day strip</td>
+<td>30 small bars, one per day, oldest on the left. Green = day passed, amber = warning, red = critical, grey = no check that day. Hover a bar to see the date and the issues</td>
+</tr>
+<tr>
+<td>Uptime % and &quot;avg ms&quot;</td>
+<td>Uptime over 30 days and the average response time</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Up or Down right now. &quot;No events&quot; means Uptime Kuma has not reported on this site yet</td>
+</tr>
+<tr>
+<td>SSL</td>
+<td>Days until the HTTPS certificate expires</td>
+</tr>
+<tr>
+<td>Domain</td>
+<td>Days until the domain name registration expires</td>
+</tr>
+<tr>
+<td>Indexing</td>
+<td>&quot;Indexable&quot; means Google may list the site. &quot;noindex&quot; or &quot;Blocked&quot; is a serious problem (see section 7)</td>
+</tr>
+<tr>
+<td>Form</td>
+<td>The contact form result: Working, Broken or Not set up</td>
+</tr>
+<tr>
+<td>Check now</td>
+<td>Runs all checks for that site immediately</td>
+</tr>
+</tbody></table>
+<p>If the site has no Uptime Kuma data you see: <em>&quot;No uptime events yet. Check this site is added in Uptime Kuma with the exact same name.&quot;</em> Fix it with <strong>Connect Uptime Kuma</strong> (section 6).</p>
+<p><strong>The details panel</strong> (click the site name) lists what needs fixing, the 30-day history with dates, and extra facts: homepage load time, Kuma average response, uptime for 24 hours and 30 days, whether <code>http://</code> redirects to <code>https://</code>, and whether <code>sitemap.xml</code> exists. It also holds the buttons <strong>Edit site</strong>, <strong>Pause monitoring</strong>, <strong>Open site</strong> and <strong>Delete</strong>.</p>
+<h2 id="5-managing-sites">5. Managing sites</h2>
+<h3>Add a site</h3>
+<p>Click <strong>Add site</strong> and fill in:</p>
+<ul>
+<li><strong>Site name.</strong> The label you see everywhere. It must match the monitor name in Uptime Kuma exactly. If you use <em>Connect Uptime Kuma</em>, the match is automatic.</li>
+<li><strong>Client.</strong> Optional, shown under the name.</li>
+<li><strong>Homepage URL.</strong> Starts with <code>http://</code> or <code>https://</code>.</li>
+<li><strong>Domain for expiry check.</strong> Optional. Leave it empty and the watchdog uses the homepage&#39;s domain. You can paste <code>www.example.com</code> or a full address; it is cleaned to <code>example.com</code>.</li>
+<li><strong>Contact form check.</strong> See below.</li>
+</ul>
+<p>If a field is wrong, the form lists what to fix in red. Nothing is saved until it is correct.</p>
+<h3>Contact form check: three modes</h3>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>What it does</th>
+<th>When to use</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>No form check</td>
+<td>Skips the form</td>
+<td>The site has no form</td>
+</tr>
+<tr>
+<td>Form is on the page</td>
+<td>Opens the page and looks for the form (or for text you choose)</td>
+<td>Forms with reCAPTCHA, or clients who do not want test emails</td>
+</tr>
+<tr>
+<td>Send a test submission</td>
+<td>Actually sends the form with the fields you list, then checks the answer</td>
+<td>Contact Form 7 or custom forms</td>
+</tr>
+</tbody></table>
+<p>For test submissions you set the fields to send (name and value rows), the expected HTTP status (usually 200), and text that must appear in the answer (for Contact Form 7 that is <code>mail_sent</code>). The Contact Form 7 address looks like <code>/wp-json/contact-form-7/v1/contact-forms/ID/feedback</code>. <strong>Test submissions can email the client</strong>, so ask them to filter the subject &quot;Automated daily form test&quot;.</p>
+<p><strong>Test this form now</strong> (inside Edit site) runs only the form check, using what is on screen, before you save. It works for saved sites.</p>
+<h3>Edit, pause, delete</h3>
+<ul>
+<li><strong>Edit site</strong> changes any detail. Renaming keeps the site&#39;s history.</li>
+<li><strong>Pause monitoring</strong> skips the site in the daily checks and greys it out. <strong>Resume monitoring</strong> brings it back. Pausing does not stop the monitor inside Uptime Kuma; pause it there too if you need to.</li>
+<li><strong>Delete</strong> removes the site and its history after you confirm. A backup copy of the settings is kept.</li>
+</ul>
+<p>Every change is saved safely and the previous version is copied to <code>config/backups/</code>.</p>
+<h2 id="6-connecting-uptime-kuma">6. Connecting Uptime Kuma</h2>
+<p>Uptime Kuma is the part that watches sites every 30 seconds. Open <strong>Connect Uptime Kuma</strong> in the top bar. The window checks Kuma and shows the step you need:</p>
+<table>
+<thead>
+<tr>
+<th>What the window says</th>
+<th>What to do</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Kuma is not reachable</td>
+<td>Start it with <code>docker compose up -d</code>, then reopen the window</td>
+</tr>
+<tr>
+<td>Kuma has no account yet</td>
+<td>Choose a username and password. <strong>Generate strong password</strong> makes one, and <strong>Copy password</strong> saves it to your clipboard. Click <strong>Create account and connect</strong></td>
+</tr>
+<tr>
+<td>Kuma has an account</td>
+<td>Type your Kuma username and password once and click <strong>Connect and sync</strong></td>
+</tr>
+<tr>
+<td>Connected</td>
+<td>Use <strong>Sync sites now</strong> any time. New sites are added automatically</td>
+</tr>
+</tbody></table>
+<p>What the connect step does for you:</p>
+<ol>
+<li>Creates the Kuma account (first time only).</li>
+<li>Creates a Kuma notification called &quot;Watchdog (Teams relay)&quot; that calls the watchdog when a site goes down or comes back.</li>
+<li>Adds a monitor for every active site: checks every 30 seconds, one quick retry after 20 seconds to avoid false alarms, certificate expiry notices on, and any 200-299 answer counts as up.</li>
+<li>Skips monitors that already exist.</li>
+</ol>
+<p><strong>Remember this login on the server</strong> (ticked by default) saves the Kuma login in the server&#39;s private data folder, readable only by the server. That is what makes new sites sync automatically. <strong>Forget saved login</strong> removes it.</p>
+<p>After connecting, the watchdog reads live numbers from Kuma every 2 minutes: Up or Down, uptime for 24 hours and 30 days, and average response time. The dashboard fills in with real data straight away.</p>
+<p>Prefer to do it by hand? The window has a &quot;Prefer to do it by hand?&quot; section with the exact link to paste into Kuma and the bulk script command.</p>
+<h2 id="7-the-daily-checks-and-what-the-results-mean">7. The daily checks and what the results mean</h2>
+<p>The watchdog runs these every day at 09:00 IST, and whenever you click <strong>Run all checks</strong> or <strong>Check now</strong>.</p>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Warning</th>
+<th>Critical</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>SSL certificate</strong> (the padlock)</td>
+<td>Expires in 14 days or less</td>
+<td>Expired, invalid, or the check failed</td>
+</tr>
+<tr>
+<td><strong>Domain registration</strong></td>
+<td>Expires in 30 days or less, or the date could not be found</td>
+<td>Already expired</td>
+</tr>
+<tr>
+<td><strong>Homepage</strong></td>
+<td>Loads slower than 3 seconds</td>
+<td>Not reachable, or an error status (400 and above)</td>
+</tr>
+<tr>
+<td><strong>Google indexing</strong></td>
+<td></td>
+<td>A <code>noindex</code> tag or header is hiding the site, or <code>robots.txt</code> blocks the whole site</td>
+</tr>
+<tr>
+<td><strong>http to https redirect</strong></td>
+<td><code>http://</code> does not move visitors to <code>https://</code></td>
+<td></td>
+</tr>
+<tr>
+<td><strong>Contact form</strong></td>
+<td></td>
+<td>The form is missing or the test submission failed</td>
+</tr>
+<tr>
+<td><strong>sitemap.xml</strong></td>
+<td>Shown as information only, never an alert</td>
+<td></td>
+</tr>
+</tbody></table>
+<p>Good to know:</p>
+<ul>
+<li><strong>Domain expiry</strong> is looked up in public databases (RDAP first, then WHOIS). If today&#39;s lookup fails, the last known date is kept and marked so you are not shown &quot;Unknown&quot; for no reason.</li>
+<li>A site&#39;s overall colour is the worst result: any critical makes it red, otherwise any warning makes it amber.</li>
+<li>The 30-day strip keeps one result per day, up to 30 days. Running checks twice in a day replaces that day&#39;s cell.</li>
+<li>Paused sites are skipped.</li>
+</ul>
+<h2 id="8-teams-alerts">8. Teams alerts</h2>
+<p>Alerts arrive as cards in your Teams <strong>group chat</strong>. You will see:</p>
+<ul>
+<li><strong>DOWN: Site name</strong>, with the site, URL, reason, time detected, and an <strong>Open dashboard</strong> button.</li>
+<li><strong>Back up: Site name</strong>, with how many minutes it was down.</li>
+<li><strong>Daily check: N of M sites need attention</strong>, after the 09:00 run, listing each site and its issues. Nothing is posted when all is well.</li>
+<li>Every card ends with <strong>On call:</strong> the person on call, plus everyone on the <strong>Always alert</strong> list, all @mentioned.</li>
+</ul>
+<p><strong>Send test alert</strong> posts a test card so you can confirm the link works.</p>
+<h3>Where alerts go: your list of destinations</h3>
+<p>Everything about who gets which alert is decided in the dashboard, not in code or files. Open <strong>Alerts and on-call</strong>. <strong>Where alerts are sent</strong> is a list of <strong>destinations</strong>. A destination is one Teams workflow: a group chat or a personal chat. Add as many as you like, for example one group chat for the dev team and one personal chat for each person on the rota.</p>
+<p>Press <strong>Add destination</strong> (or <strong>Edit</strong> on an existing one) and set:</p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Name</strong></td>
+<td>A label only you see, such as &quot;Dev team group&quot; or &quot;Sushant&quot;</td>
+</tr>
+<tr>
+<td><strong>Type</strong></td>
+<td>Group chat or Personal chat</td>
+</tr>
+<tr>
+<td><strong>Teams link</strong></td>
+<td>The secret link from that destination&#39;s Teams workflow. It is kept on the server and never shown again (you see only its last few characters). Paste a new one only to replace it</td>
+</tr>
+<tr>
+<td><strong>Send these alerts</strong></td>
+<td>Tick the ones it should get: a site goes down, a site comes back up, the daily check summary, and notices from Uptime Kuma (such as certificate expiry)</td>
+</tr>
+<tr>
+<td><strong>For which sites</strong></td>
+<td>All sites, or only the sites you tick. In a daily summary a destination sees only its own sites</td>
+</tr>
+<tr>
+<td><strong>When to send</strong></td>
+<td>Always, or <strong>only while a chosen person is on call</strong>. This is how each person&#39;s own personal chat gets the alerts only during their week</td>
+</tr>
+<tr>
+<td><strong>@mention people</strong></td>
+<td>Turns real @mentions on or off. Leave it off for a personal chat</td>
+</tr>
+</tbody></table>
+<p>Each row in the list has an <strong>On</strong> tick (switch it on or off without losing its settings), <strong>Test</strong> (sends exactly one test message to that destination, whatever its rules say) and <strong>Edit</strong>. Inside <strong>Edit</strong> you can also <strong>Delete</strong> it.</p>
+<p>An alert goes to <strong>every</strong> destination whose rules match it. If none match, the alert still appears in the dashboard&#39;s outage list and is marked &quot;No destination matched&quot;.</p>
+<p>Nothing is sent unless there is a real alert, a daily check with problems, a manual <strong>Run all checks</strong>, or you press a test button. The top bar&#39;s <strong>Send test alert</strong> asks you to confirm and then sends one message to every destination that is on. The automatic run when the watchdog first starts only fills the dashboard and never posts to Teams.</p>
+<p><strong>Example setup</strong></p>
+<ul>
+<li><em>Dev team group</em>: group chat, outages and recoveries, all sites, always.</li>
+<li><em>Sushant</em>: personal chat, all alerts, all sites, only while Sushant is on call.</li>
+<li><em>Gemkara lead</em>: personal chat, outages only, only the site &quot;OYA by Gemkara&quot;, always.</li>
+</ul>
+<p><strong>How to get a link for a destination</strong></p>
+<ol>
+<li>In Teams open <strong>Workflows</strong> and pick the template <strong>Send webhook alerts to a chat</strong>.</li>
+<li><strong>Group chat:</strong> for &quot;Post in&quot; choose Group chat and pick the chat.</li>
+<li><strong>Personal chat:</strong> the person who should receive the alerts creates it and chooses <strong>Chat with Workflow bot</strong>. If Teams shows a <strong>Recipient</strong> box instead, enter their email there.</li>
+<li>Create it, copy the link at the end and paste it into the destination. Each destination needs its own link.</li>
+</ol>
+<p>Keep every link secret. Anyone who has it can post in that chat. If a link is shared by mistake, create a new workflow and paste the new link into the destination.</p>
+<h3>Alerts and on-call window</h3>
+<ul>
+<li><strong>Always alert.</strong> People who are @mentioned on every alert (for example Sushant, <code>sushant@nuformsocial.com</code>). Add a name and Teams email.</li>
+<li><strong>Weekly on-call rota.</strong> Add a person with a name, optional Teams email, and from/to dates. The person whose dates include today is &quot;on call now&quot;. Without a Teams email the name shows but there is no @mention.</li>
+</ul>
+<h2 id="9-how-often-sites-are-rechecked-and-what-data-we-collect">9. How often sites are rechecked and what data we collect</h2>
+<p><strong>Timing</strong></p>
+<table>
+<thead>
+<tr>
+<th>What</th>
+<th>How often</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Uptime Kuma opens every site</td>
+<td><strong>Every 30 seconds</strong></td>
+</tr>
+<tr>
+<td>After a failed check</td>
+<td>Kuma checks again after <strong>20 seconds</strong>. If that fails too, the site is marked <strong>Down</strong> and the alert goes out</td>
+</tr>
+<tr>
+<td>Time from a real outage to the alert</td>
+<td>About <strong>20 to 50 seconds</strong> for Kuma to confirm, plus a few seconds to reach Teams. The &quot;Average outage to alert&quot; box shows the real figure</td>
+</tr>
+<tr>
+<td>Site comes back</td>
+<td>The &quot;Back up&quot; alert goes out at the first successful check, within about 30 seconds</td>
+</tr>
+<tr>
+<td>Daily checks (SSL, domain, indexing, form, speed and more)</td>
+<td><strong>Every day at 09:00 IST</strong>, and any time you press <strong>Check now</strong> or <strong>Run all checks</strong></td>
+</tr>
+<tr>
+<td>Uptime numbers from Kuma on the dashboard</td>
+<td>Refreshed <strong>every 2 minutes</strong></td>
+</tr>
+<tr>
+<td>The dashboard screen</td>
+<td>Updates by itself the moment something changes</td>
+</tr>
+</tbody></table>
+<p>These timings are set when a monitor is created. Sync never changes monitors that already exist, so to use a different interval, edit that monitor inside Uptime Kuma.</p>
+<p><strong>Data we collect</strong></p>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>Data</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Uptime Kuma</td>
+<td>Up or Down now and the reason, uptime for 24 hours and 30 days, average response time, and every outage and recovery</td>
+</tr>
+<tr>
+<td>SSL check</td>
+<td>Days left, expiry date, who issued it, and whether the certificate is valid</td>
+</tr>
+<tr>
+<td>Domain check</td>
+<td>Days until the domain registration expires, and where the date came from (RDAP or WHOIS)</td>
+</tr>
+<tr>
+<td>Homepage check</td>
+<td>HTTP status, load time in milliseconds, <code>noindex</code> tag or header, whether <code>robots.txt</code> blocks everything</td>
+</tr>
+<tr>
+<td>Extra checks</td>
+<td>Whether <code>http://</code> redirects to <code>https://</code>, whether <code>sitemap.xml</code> exists</td>
+</tr>
+<tr>
+<td>Contact form</td>
+<td>Present, or a test submission worked, with the HTTP status</td>
+</tr>
+<tr>
+<td>Kept over time</td>
+<td>One result per site per day for 30 days (with the load time), and the last 500 outage alerts</td>
+</tr>
+</tbody></table>
+<h2 id="10-live-updates">10. Live updates</h2>
+<p>The dashboard refreshes by itself when anything changes: an outage, a finished check, a saved edit. If you have a window open (such as the site editor), the refresh waits until you close it so you do not lose what you typed.</p>
+<h2 id="11-where-things-are-stored">11. Where things are stored</h2>
+<table>
+<thead>
+<tr>
+<th>What</th>
+<th>Where</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Site list</td>
+<td><code>config/sites.json</code></td>
+</tr>
+<tr>
+<td>On-call rota</td>
+<td><code>config/oncall.json</code></td>
+</tr>
+<tr>
+<td>Always-alert people</td>
+<td><code>config/settings.json</code></td>
+</tr>
+<tr>
+<td>Previous versions of the above (last 50 each)</td>
+<td><code>config/backups/</code></td>
+</tr>
+<tr>
+<td>Results, 30-day history, outage log (last 500), Kuma numbers</td>
+<td><code>state.json</code> in the data volume</td>
+</tr>
+<tr>
+<td>Saved Kuma login (if you chose to remember it)</td>
+<td><code>kuma.json</code> in the data volume, private to the server</td>
+</tr>
+<tr>
+<td>Teams destinations and their links</td>
+<td><code>destinations.json</code> in the data volume, private to the server</td>
+</tr>
+<tr>
+<td>Uptime Kuma&#39;s own data</td>
+<td>The <code>kuma-data</code> Docker volume</td>
+</tr>
+</tbody></table>
+<p>You can still edit the config files by hand; changes apply without a restart.</p>
+<h2 id="12-troubleshooting">12. Troubleshooting</h2>
+<table>
+<thead>
+<tr>
+<th>Problem</th>
+<th>Likely cause and fix</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>A test says it failed, or the log says <code>WorkflowTriggerIsNotEnabled</code></td>
+<td>That Teams Workflow is switched off. In Teams open <strong>Workflows</strong>, find it and turn it on</td>
+</tr>
+<tr>
+<td>Messages reach the group but not a personal chat</td>
+<td>The personal chat needs its own destination with its own link. Add it under <strong>Alerts and on-call &gt; Where alerts are sent</strong> and make sure it is On</td>
+</tr>
+<tr>
+<td>An alert shows &quot;No destination matched&quot;</td>
+<td>No destination is on for that kind of alert and site, or its on-call rule does not match this week&#39;s person. Edit the destination&#39;s rules</td>
+</tr>
+<tr>
+<td>&quot;Teams alerts are off&quot; banner</td>
+<td><code>TEAMS_WEBHOOK_URL</code> is empty in <code>.env</code></td>
+</tr>
+<tr>
+<td>&quot;No uptime events yet&quot; on a site</td>
+<td>The site is not in Kuma, or its name differs. Use <strong>Connect Uptime Kuma &gt; Sync sites now</strong></td>
+</tr>
+<tr>
+<td>Cannot sign in with the Kuma login</td>
+<td>Try the <code>nuform</code> login from <code>.env</code>. If Kuma is down the Kuma login cannot be checked</td>
+</tr>
+<tr>
+<td>Forgot the Kuma password</td>
+<td>Kuma cannot reset it. Sign in with the <code>nuform</code> login. If you need Kuma access, reset Kuma&#39;s data (this deletes its monitors; the dashboard can re-add them)</td>
+</tr>
+<tr>
+<td>Domain shows Unknown</td>
+<td>Public lookup failed. The watchdog retries tomorrow. Check the domain field has only the main domain, such as <code>example.com</code></td>
+</tr>
+<tr>
+<td>Form shows Broken</td>
+<td>Open <strong>Edit site &gt; Test this form now</strong> to see the exact error</td>
+</tr>
+<tr>
+<td>Dashboard will not open</td>
+<td>Run <code>docker compose ps</code> and check both containers are healthy</td>
+</tr>
+</tbody></table>
+<h2 id="13-admin-notes">13. Admin notes</h2>
+<p><strong>Start, stop, logs</strong></p>
+<pre><code>docker compose up -d --build      start (or restart after changing .env)
+docker compose ps                 check both containers are healthy
+docker compose logs -f watchdog   watch the watchdog&#39;s log
+docker compose down               stop (data is kept)
+</code></pre>
+<p><strong>Run without Docker (watchdog only)</strong></p>
+<pre><code>cd app
+npm install
+npm start          # or: npm run dev   (restarts on file changes)
+</code></pre>
+<p>Uptime Kuma still needs Docker (or its own npm install). Settings are read from the <code>.env</code> file in the project folder.</p>
+<p><strong>Settings in <code>.env</code></strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Meaning</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>TEAMS_WEBHOOK_URL</code>, <code>TEAMS_DM_WEBHOOK_URL</code></td>
+<td>Optional. Only read <strong>once</strong>, the first time the watchdog starts, to create a destination from an older setup. After that, destinations are managed only in the dashboard</td>
+<td>empty</td>
+</tr>
+<tr>
+<td><code>HOOK_TOKEN</code></td>
+<td>Secret Kuma uses when calling the watchdog</td>
+<td>generated</td>
+</tr>
+<tr>
+<td><code>DASH_USER</code>, <code>DASH_PASS</code></td>
+<td>Backup dashboard login</td>
+<td><code>nuform</code>, generated</td>
+</tr>
+<tr>
+<td><code>DASHBOARD_URL</code></td>
+<td>Link behind &quot;Open dashboard&quot; in Teams</td>
+<td><code>http://localhost:3001</code></td>
+</tr>
+<tr>
+<td><code>CHECK_CRON</code></td>
+<td>When daily checks run</td>
+<td><code>0 9 * * *</code></td>
+</tr>
+<tr>
+<td><code>TZ</code></td>
+<td>Time zone</td>
+<td><code>Asia/Kolkata</code></td>
+</tr>
+<tr>
+<td><code>SSL_WARN_DAYS</code></td>
+<td>SSL warning threshold</td>
+<td>14</td>
+</tr>
+<tr>
+<td><code>DOMAIN_WARN_DAYS</code></td>
+<td>Domain warning threshold</td>
+<td>30</td>
+</tr>
+<tr>
+<td><code>SLOW_MS</code></td>
+<td>Slow homepage threshold in milliseconds</td>
+<td>3000</td>
+</tr>
+</tbody></table>
+<p><strong>Before going live on a server:</strong> put both ports behind HTTPS (for example Nginx with Let&#39;s Encrypt), change <code>DASHBOARD_URL</code> to the public address, and back up the two Docker volumes.</p>
+<p><strong>Health check:</strong> <code>/healthz</code> answers without a login so an outside monitor can watch the watchdog itself.</p>
+<h2 id="14-not-included-yet">14. Not included yet</h2>
+<ul>
+<li>Reports (scheduled summaries). The brief for this part was not finished.</li>
+<li>Per-person permissions: everyone who can sign in has full access.</li>
+<li>Pausing a site does not pause its Uptime Kuma monitor.</li>
+</ul>
+<h2 id="15-glossary">15. Glossary</h2>
+<ul>
+<li><strong>Uptime:</strong> the share of time a site was reachable.</li>
+<li><strong>Outage:</strong> a period when a site could not be reached.</li>
+<li><strong>SSL certificate:</strong> what makes the padlock and <code>https://</code> work. When it expires, browsers warn visitors.</li>
+<li><strong>Domain:</strong> the website&#39;s name (example.com). It is rented yearly and must be renewed.</li>
+<li><strong>noindex:</strong> an instruction that tells Google not to list a page. Dangerous if left on by mistake.</li>
+<li><strong>robots.txt:</strong> a file that tells search engines which parts of a site to skip.</li>
+<li><strong>sitemap.xml:</strong> a list of pages that helps Google find them all.</li>
+<li><strong>Webhook:</strong> an automatic message one tool sends another, like a phone call between programs.</li>
+<li><strong>On call:</strong> the person responsible for reacting to alerts that week.</li>
+</ul>
+</div></body></html>

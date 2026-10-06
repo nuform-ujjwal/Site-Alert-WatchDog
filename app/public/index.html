@@ -1,0 +1,941 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Client site watchdog | Nuform</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐕</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F2F4F7; --surface:#FFFFFF; --ink:#142033; --muted:#58637A; --line:#DDE2EA; --line-strong:#B9C1CF;
+    --accent:#3B4BD8; --accent-ink:#FFFFFF;
+    --ok:#0B8A5E; --warn:#B76100; --crit:#C42B3B;
+    --ok-bg:#E4F4EC; --warn-bg:#FCEFD9; --crit-bg:#FBE4E7; --none-bg:#E8ECF2;
+    --cell-none:#D5DBE5;
+    --radius:10px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0F1623; --surface:#172033; --ink:#E8EDF6; --muted:#9AA6BD; --line:#26324A; --line-strong:#3A4868;
+      --accent:#7C8BFF; --accent-ink:#0F1623;
+      --ok:#3FD19A; --warn:#F2A33C; --crit:#FF7686;
+      --ok-bg:#12332A; --warn-bg:#3A2A12; --crit-bg:#3C1A22; --none-bg:#22304A; --cell-none:#2B3955;
+    }
+  }
+  *{box-sizing:border-box}
+  [hidden]{display:none!important}
+  html{scroll-padding-top:16px}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",sans-serif;font-variant-numeric:tabular-nums}
+  .wrap{max-width:1320px;margin:0 auto;padding:24px 24px 80px}
+  a{color:inherit}
+  button,input,select,textarea{font:inherit;color:inherit}
+  :focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+  /* buttons */
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:8px;border:1px solid var(--line-strong);background:var(--surface);font-weight:550;font-size:14px;cursor:pointer;white-space:nowrap}
+  .btn:hover{border-color:var(--ink)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+  .btn.primary:hover{filter:brightness(1.08)}
+  .btn.danger{color:var(--crit);border-color:var(--crit)}
+  .btn.small{padding:5px 10px;font-size:13px}
+  .btn:disabled{opacity:.55;cursor:progress}
+  .linkbtn{background:none;border:0;padding:0;color:var(--accent);font-weight:550;cursor:pointer;text-decoration:underline}
+
+  /* top bar */
+  .top{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .brand{font-weight:700;font-size:18px;letter-spacing:-.01em}
+  .brand small{display:block;font-weight:400;font-size:13px;color:var(--muted);letter-spacing:0}
+  .actions{display:flex;gap:8px;flex-wrap:wrap}
+
+  /* verdict */
+  .hero{display:grid;grid-template-columns:1fr auto;gap:24px;align-items:end;margin:32px 0 20px}
+  .verdict{border-left:8px solid var(--ok);padding-left:20px}
+  .verdict.warning{border-color:var(--warn)} .verdict.critical{border-color:var(--crit)}
+  .verdict h1{margin:0;font-size:clamp(28px,4.2vw,48px);line-height:1.08;font-weight:650;font-stretch:90%;letter-spacing:-.025em;max-width:20ch}
+  .verdict p{margin:10px 0 0;color:var(--muted)}
+  .oncall{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:14px 18px;min-width:230px}
+  .oncall span{display:block;color:var(--muted);font-size:13px}
+  .oncall b{display:block;font-size:20px;font-weight:650;margin:2px 0 4px}
+
+  .banner{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:var(--warn-bg);color:var(--ink);border:1px solid var(--warn);border-radius:var(--radius);padding:10px 14px;margin-bottom:16px;font-size:14px}
+
+  /* metrics */
+  .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:28px}
+  .metric{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:12px 16px}
+  .metric strong{display:block;font-size:26px;font-weight:650;letter-spacing:-.02em;line-height:1.2}
+  .metric span{color:var(--muted);font-size:13px}
+
+  /* list header */
+  .listbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+  .listbar h2{margin:0;font-size:20px;font-weight:650}
+  .chips{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{padding:5px 12px;border-radius:999px;border:1px solid var(--line-strong);background:transparent;cursor:pointer;font-size:13px;font-weight:550}
+  .chip[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+
+  /* site rows */
+  .sites{display:flex;flex-direction:column;gap:10px}
+  .site{background:var(--surface);border:1px solid var(--line);border-left:6px solid var(--line-strong);border-radius:var(--radius)}
+  .site.ok{border-left-color:var(--ok)} .site.warning{border-left-color:var(--warn)} .site.critical{border-left-color:var(--crit)}
+  .site.paused{opacity:.62;border-left-style:dashed}
+  .row{display:grid;grid-template-columns:minmax(200px,1.1fr) minmax(280px,1.6fr) 74px repeat(4,minmax(86px,.5fr)) auto;gap:14px;align-items:center;padding:14px 16px}
+  .name{min-width:0}
+  .name button{all:unset;cursor:pointer;font-weight:650;font-size:16px;display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .name button:focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:4px}
+  .name small{display:block;color:var(--muted);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .strip{display:grid;grid-template-columns:repeat(30,1fr);gap:2px;height:34px;align-items:end}
+  .strip i{display:block;border-radius:2px;background:var(--cell-none);height:34%}
+  .strip i.ok{background:var(--ok);height:100%} .strip i.warning{background:var(--warn);height:100%} .strip i.critical{background:var(--crit);height:100%}
+  .stripcap{display:flex;justify-content:space-between;color:var(--muted);font-size:11px;margin-top:3px}
+  .metric-cell small,.cell small{display:block;color:var(--muted);font-size:12px}
+  .cell{font-size:13px;min-width:0}
+  .colhead{display:none}
+  .pct{font-weight:650;font-size:17px}
+  .pill{display:inline-block;padding:1px 9px;border-radius:999px;font-size:13px;font-weight:600;white-space:nowrap}
+  .pill.ok{color:var(--ok);background:var(--ok-bg)} .pill.warning{color:var(--warn);background:var(--warn-bg)} .pill.critical{color:var(--crit);background:var(--crit-bg)} .pill.none,.pill.paused{color:var(--muted);background:var(--none-bg)}
+  .rowact{display:flex;gap:6px;justify-content:flex-end}
+
+  .detail{border-top:1px solid var(--line);padding:16px 18px 18px;display:grid;grid-template-columns:1.3fr 1fr;gap:24px}
+  .detail h4{margin:0 0 6px;font-size:14px}
+  .detail ul{margin:0;padding-left:18px;font-size:14px}
+  .detail .muted{color:var(--muted);font-size:13px}
+  .detail .btnrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+  .nokuma{margin:0 18px 14px;background:var(--warn-bg);border:1px solid var(--warn);border-radius:8px;padding:8px 12px;font-size:13px}
+  .nokuma-row{margin:0 16px 12px;font-size:13px;color:var(--warn);font-weight:550}
+  .dates{display:grid;grid-template-columns:repeat(30,1fr);gap:2px;height:46px;align-items:end;margin:6px 0 2px}
+  .dates i{display:block;border-radius:2px;background:var(--cell-none);height:34%}
+  .dates i.ok{background:var(--ok);height:100%} .dates i.warning{background:var(--warn);height:100%} .dates i.critical{background:var(--crit);height:100%}
+
+  .empty{background:var(--surface);border:1px dashed var(--line-strong);border-radius:var(--radius);padding:36px 24px;text-align:center;color:var(--muted)}
+  .empty h3{margin:0 0 6px;color:var(--ink);font-size:18px}
+
+  /* alerts log */
+  .log{margin-top:36px}
+  .log h2{font-size:20px;font-weight:650;margin:0 0 10px}
+  .log ol{list-style:none;margin:0;padding:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius)}
+  .log li{display:grid;grid-template-columns:150px 1fr auto;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line);font-size:14px}
+  .log li:last-child{border-bottom:0}
+  .log li.none{display:block;color:var(--muted);text-align:center;padding:24px}
+  .log time,.log .speed{color:var(--muted)} .log .speed{text-align:right}
+  .log b.down{color:var(--crit)} .log b.up{color:var(--ok)}
+
+  /* dialogs + forms */
+  dialog{border:1px solid var(--line-strong);border-radius:14px;padding:0;background:var(--surface);color:var(--ink);width:min(680px,calc(100vw - 24px));max-height:calc(100vh - 32px)}
+  dialog::backdrop{background:rgba(10,16,30,.55)}
+  .dhead{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--surface)}
+  .dhead h3{margin:0;font-size:19px;font-weight:650}
+  .dbody{padding:18px 20px 20px;display:flex;flex-direction:column;gap:14px}
+  .dfoot{display:flex;justify-content:flex-end;gap:8px;padding:14px 20px;border-top:1px solid var(--line);position:sticky;bottom:0;background:var(--surface)}
+  label.f{display:flex;flex-direction:column;gap:4px;font-weight:550;font-size:14px}
+  label.f small{font-weight:400;color:var(--muted)}
+  input[type=text],input[type=url],input[type=email],input[type=date],input[type=password],input[type=number],select,textarea{padding:8px 10px;border:1px solid var(--line-strong);border-radius:8px;background:var(--bg);width:100%}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .seg{display:inline-flex;border:1px solid var(--line-strong);border-radius:8px;overflow:hidden;align-self:flex-start}
+  .seg label{padding:7px 14px;cursor:pointer;font-size:14px;font-weight:550;border-right:1px solid var(--line-strong)}
+  .seg label:last-child{border-right:0}
+  .seg input{position:absolute;opacity:0;pointer-events:none}
+  .seg label:has(input:checked){background:var(--ink);color:var(--bg)}
+  .seg label:has(input:focus-visible){outline:3px solid var(--accent);outline-offset:-3px}
+  .kv{display:flex;flex-direction:column;gap:6px}
+  .kvrow{display:grid;grid-template-columns:1fr 1.4fr auto;gap:6px}
+  fieldset{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:0;display:flex;flex-direction:column;gap:12px}
+  fieldset legend{font-weight:650;padding:0 6px}
+  .errors{background:var(--crit-bg);border:1px solid var(--crit);border-radius:8px;padding:8px 12px;font-size:14px}
+  .errors ul{margin:0;padding-left:18px}
+  .result{border-radius:8px;padding:8px 12px;font-size:14px;border:1px solid var(--line-strong)}
+  .result.ok{background:var(--ok-bg);border-color:var(--ok)} .result.bad{background:var(--crit-bg);border-color:var(--crit)}
+  .rota{list-style:none;margin:0;padding:0;border:1px solid var(--line);border-radius:10px}
+  .rota li{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line);font-size:14px}
+  .rota li:last-child{border-bottom:0}
+  .rota li.now{background:var(--ok-bg)}
+  .rota small{color:var(--muted)}
+  pre.code{margin:0;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-all}
+  details summary{cursor:pointer;font-weight:600}
+
+  label.chk{display:flex;gap:8px;align-items:flex-start;font-size:14px;font-weight:500}
+  label.chk input{margin-top:4px}
+  .dest{border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;gap:12px;justify-content:space-between;align-items:center;flex-wrap:wrap}
+  .dest.off{opacity:.65}
+  .pwrap{position:relative;display:flex}
+  .pwrap input{padding-right:46px}
+  .eye{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:34px;height:34px;display:grid;place-items:center;border:0;border-radius:6px;background:transparent;color:var(--muted);cursor:pointer}
+  .eye:hover{color:var(--ink)} .eye svg{width:20px;height:20px} .eye .off{display:none}
+  .eye[aria-pressed=true] .on{display:none} .eye[aria-pressed=true] .off{display:block}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:14px;display:none;z-index:99;max-width:90vw}
+
+  @media (max-width:1180px){
+    .row{grid-template-columns:1fr 1fr;gap:12px}
+    .row .strip-wrap{grid-column:1/-1;order:3}
+    .rowact{order:2}
+    .colhead{display:block;color:var(--muted);font-size:12px}
+    .row .cell{order:4}
+    .row .pctcell{order:4}
+  }
+  @media (max-width:760px){
+    .wrap{padding:16px 12px 64px}
+    .hero{grid-template-columns:1fr}
+    .detail{grid-template-columns:1fr}
+    .log li{grid-template-columns:1fr;gap:2px} .log .speed{text-align:left}
+    .two{grid-template-columns:1fr}
+    .kvrow{grid-template-columns:1fr 1fr auto}
+  }
+  @media (prefers-reduced-motion: no-preference){
+    .site{transition:border-color .2s}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">Client site watchdog<small>Nuform Social</small></div>
+    <div class="actions">
+      <button class="btn" id="oncallBtn">On-call rota</button>
+      <button class="btn" id="kumaBtn">Connect Uptime Kuma</button>
+      <button class="btn" id="testBtn">Send test alert</button>
+      <button class="btn" id="runBtn">Run all checks</button>
+      <button class="btn primary" id="addBtn">Add site</button>
+      <button class="btn" id="helpBtn">Help and docs</button>
+      <button class="btn" id="logoutBtn">Log out</button>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="verdict" id="verdict"><h1>Loading site status…</h1><p></p></div>
+    <div class="oncall"><span>On call now</span><b id="oncall">…</b><button class="linkbtn" id="oncall2">Change rota</button></div>
+  </section>
+
+  <div class="banner" id="teamsBanner" hidden>
+    <span><b>No Teams destination is switched on.</b> Outages are recorded here, but nobody is pinged.</span>
+    <button class="btn small" id="setupTeams">Set up Teams</button>
+  </div>
+
+  <section class="metrics" id="metrics"></section>
+
+  <section>
+    <div class="listbar">
+      <h2>Sites</h2>
+      <div class="chips" role="group" aria-label="Filter sites">
+        <button class="chip" data-f="all" aria-pressed="true">All</button>
+        <button class="chip" data-f="attention" aria-pressed="false">Needs attention</button>
+        <button class="chip" data-f="paused" aria-pressed="false">Paused</button>
+      </div>
+    </div>
+    <div class="sites" id="sites"></div>
+  </section>
+
+  <section class="log">
+    <h2>Recent outage alerts</h2>
+    <ol id="alerts"></ol>
+  </section>
+</div>
+
+<!-- Site editor -->
+<dialog id="siteDlg" aria-labelledby="siteTitle">
+  <form method="dialog" id="siteForm" novalidate>
+    <div class="dhead"><h3 id="siteTitle">Add site</h3><button type="button" class="btn small" data-close>Close</button></div>
+    <div class="dbody">
+      <div class="errors" id="siteErrors" hidden></div>
+      <div class="two">
+        <label class="f">Site name<small>Must match the monitor name in Uptime Kuma exactly.</small><input type="text" id="fName" required></label>
+        <label class="f">Client<small>Shown under the site name.</small><input type="text" id="fClient"></label>
+      </div>
+      <label class="f">Homepage URL<input type="url" id="fUrl" placeholder="https://example.com" required></label>
+      <label class="f">Domain for expiry check<small>Leave empty to use the homepage's domain.</small><input type="text" id="fDomain" placeholder="example.com"></label>
+
+      <fieldset>
+        <legend>Contact form check</legend>
+        <div class="seg" role="radiogroup" aria-label="Form check mode">
+          <label><input type="radio" name="fMode" value="none">No form check</label>
+          <label><input type="radio" name="fMode" value="presence">Form is on the page</label>
+          <label><input type="radio" name="fMode" value="submit">Send a test submission</label>
+        </div>
+        <div id="formFields" hidden>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <label class="f">Form page or endpoint URL<small id="fFormUrlHelp"></small><input type="url" id="fFormUrl"></label>
+            <label class="f">Text that proves it works<small id="fExpectHelp"></small><input type="text" id="fExpectText"></label>
+            <div id="submitOnly" hidden style="display:none;flex-direction:column;gap:12px">
+              <div class="two">
+                <label class="f">Expected HTTP status<input type="number" id="fExpectStatus" min="100" max="599" value="200"></label>
+                <label class="f">Body format<select id="fType"><option value="urlencoded">Standard form (urlencoded)</option><option value="multipart">Multipart (WordPress CF7)</option><option value="json">JSON</option></select></label>
+              </div>
+              <div class="f"><span style="font-weight:550">Form fields to send</span>
+                <div class="kv" id="kv"></div>
+                <div><button type="button" class="btn small" id="addKv">Add field</button></div>
+              </div>
+              <div class="errors" style="background:var(--warn-bg);border-color:var(--warn)">Test submissions can email the client. Ask them to filter the subject "Automated daily form test".</div>
+            </div>
+            <div><button type="button" class="btn" id="testFormBtn">Test this form now</button></div>
+            <div class="result" id="formResult" hidden></div>
+          </div>
+        </div>
+      </fieldset>
+    </div>
+    <div class="dfoot"><button type="button" class="btn" data-close>Cancel</button><button type="submit" class="btn primary" id="saveSite">Save site</button></div>
+  </form>
+</dialog>
+
+<!-- On-call -->
+<dialog id="ocDlg" aria-labelledby="ocTitle">
+  <div class="dhead"><h3 id="ocTitle">Alerts and on-call</h3><button type="button" class="btn small" data-close>Close</button></div>
+  <div class="dbody">
+    <fieldset>
+      <legend>Where alerts are sent</legend>
+      <p style="margin:0;color:var(--muted);font-size:14px">Add as many Teams group chats and personal chats as you like. For each one you choose which alerts it gets, for which sites, and whether only while a certain person is on call. Nothing is sent until a real alert happens or you press a test button.</p>
+      <div id="dests" style="display:flex;flex-direction:column;gap:10px"></div>
+      <div><button type="button" class="btn primary" id="addDest">Add destination</button></div>
+      <details>
+        <summary>How to get a Teams link</summary>
+        <ol style="margin:8px 0 0;padding-left:20px;font-size:14px;display:flex;flex-direction:column;gap:4px">
+          <li>In Teams open <b>Workflows</b> and pick the template <b>Send webhook alerts to a chat</b>.</li>
+          <li><b>Group chat:</b> for "Post in" choose Group chat and pick the chat.</li>
+          <li><b>Personal chat:</b> the person who should receive alerts creates it and chooses <b>Chat with Workflow bot</b>. If Teams shows a Recipient box, enter their email there.</li>
+          <li>Create it, copy the link at the end, and paste it into the destination here. Each destination needs its own link.</li>
+        </ol>
+      </details>
+    </fieldset>
+    <fieldset>
+      <legend>Always alert</legend>
+      <p style="margin:0;color:var(--muted);font-size:14px">These people are @mentioned on every outage alert in Teams, on top of whoever is on call.</p>
+      <ul class="rota" id="recips"></ul>
+      <form id="rcForm" novalidate style="display:flex;flex-direction:column;gap:10px">
+        <div class="errors" id="rcErrors" hidden></div>
+        <div class="two">
+          <label class="f">Name<input type="text" id="rcName" required></label>
+          <label class="f">Teams email<input type="email" id="rcUpn" placeholder="name@nuformsocial.com" required></label>
+        </div>
+        <div><button type="submit" class="btn">Add recipient</button></div>
+      </form>
+    </fieldset>
+    <h4 style="margin:4px 0 0;font-size:15px">Weekly on-call rota</h4>
+    <ul class="rota" id="rota"></ul>
+    <form id="ocForm" novalidate style="display:flex;flex-direction:column;gap:12px">
+      <div class="errors" id="ocErrors" hidden></div>
+      <div class="two">
+        <label class="f">Name<input type="text" id="ocName" required></label>
+        <label class="f">Teams email<small>Optional. Lets Teams @mention them.</small><input type="email" id="ocUpn"></label>
+      </div>
+      <div class="two">
+        <label class="f">From<input type="date" id="ocFrom"></label>
+        <label class="f">To<input type="date" id="ocTo"></label>
+      </div>
+      <div><button type="submit" class="btn primary">Add to rota</button></div>
+    </form>
+  </div>
+</dialog>
+
+<!-- Destination editor -->
+<dialog id="destDlg" aria-labelledby="destTitle">
+  <form id="destForm" novalidate>
+    <div class="dhead"><h3 id="destTitle">Add destination</h3><button type="button" class="btn small" data-close>Close</button></div>
+    <div class="dbody">
+      <div class="errors" id="destErrors" hidden></div>
+      <div class="two">
+        <label class="f">Name<small>For you only, such as "Dev team group" or "Sushant".</small><input type="text" id="dName"></label>
+        <label class="f">Type<small>&nbsp;</small><select id="dKind"><option value="group">Group chat</option><option value="personal">Personal chat</option></select></label>
+      </div>
+      <label class="f">Teams link<small id="dLinkHelp"></small><input type="password" id="dUrl" autocomplete="off" placeholder="https://..."></label>
+      <fieldset>
+        <legend>Send these alerts</legend>
+        <label class="chk"><input type="checkbox" id="evDown"> A site goes down</label>
+        <label class="chk"><input type="checkbox" id="evUp"> A site comes back up</label>
+        <label class="chk"><input type="checkbox" id="evDaily"> Daily check summary (09:00)</label>
+        <label class="chk"><input type="checkbox" id="evNotice"> Notices from Uptime Kuma, such as certificate expiry</label>
+      </fieldset>
+      <fieldset>
+        <legend>For which sites</legend>
+        <div class="seg" role="radiogroup" aria-label="Which sites">
+          <label><input type="radio" name="dScope" value="all">All sites</label>
+          <label><input type="radio" name="dScope" value="sites">Only selected sites</label>
+        </div>
+        <div id="dSites" style="display:none;flex-direction:column;gap:6px;max-height:180px;overflow:auto"></div>
+      </fieldset>
+      <fieldset>
+        <legend>Who it is for</legend>
+        <label class="f">When to send<select id="dOnCall"></select></label>
+        <label class="chk"><input type="checkbox" id="dMention"> @mention the on-call person and the always-alert people</label>
+      </fieldset>
+    </div>
+    <div class="dfoot">
+      <button type="button" class="btn danger" id="dDelete" hidden>Delete</button>
+      <span style="flex:1"></span>
+      <button type="button" class="btn" id="dTest">Send one test message</button>
+      <button type="submit" class="btn primary" id="dSave">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Docs -->
+<dialog id="helpDlg" aria-labelledby="helpTitle">
+  <div class="dhead"><h3 id="helpTitle">Help and docs</h3><button type="button" class="btn small" data-close>Close</button></div>
+  <div class="dbody">
+    <p style="margin:0">The user guide explains every feature in plain language: adding sites, the checks, Teams alerts, Uptime Kuma and what each colour means.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <a class="btn primary" href="/docs/user-guide.html" target="_blank" rel="noopener">Read the guide</a>
+      <a class="btn" href="/docs/Site-Watchdog-User-Guide.pdf" download>Download PDF</a>
+      <a class="btn" href="/docs/Site-Watchdog-User-Guide.md" download>Download Markdown</a>
+    </div>
+  </div>
+</dialog>
+
+<!-- Kuma -->
+<dialog id="kumaDlg" aria-labelledby="kumaTitle">
+  <div class="dhead"><h3 id="kumaTitle">Uptime Kuma</h3><button type="button" class="btn small" data-close>Close</button></div>
+  <div class="dbody">
+    <div class="result" id="kumaState">Checking Uptime Kuma…</div>
+
+    <!-- Kuma is brand new: create the admin account -->
+    <form id="kumaSetup" class="kpanel" hidden style="display:none;flex-direction:column;gap:12px">
+      <p style="margin:0"><b>Create your Uptime Kuma account.</b> Pick a username and password here. This creates the account, connects Kuma to this watchdog and adds all your sites in one go.</p>
+      <div class="two">
+        <label class="f">Username<input type="text" id="sUser" value="admin" autocomplete="off"></label>
+        <label class="f">Password<small>8+ characters with letters and numbers.</small>
+          <input type="password" id="sPass" autocomplete="new-password">
+        </label>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <button type="button" class="btn small" id="sGen">Generate strong password</button>
+        <button type="button" class="btn small" id="sCopy">Copy password</button>
+        <span class="muted" id="sStrength" style="color:var(--muted);font-size:13px"></span>
+      </div>
+      <label style="display:flex;gap:8px;align-items:flex-start;font-size:14px"><input type="checkbox" id="sRemember" checked style="margin-top:4px"><span>Remember this login on the server so new sites are added to Uptime Kuma automatically. <small style="color:var(--muted)">Stored only in the watchdog's private data folder.</small></span></label>
+      <div><button type="submit" class="btn primary" id="sGo">Create account and connect</button></div>
+    </form>
+
+    <!-- Kuma has an account but we are not connected yet -->
+    <form id="kumaLogin" class="kpanel" hidden style="display:none;flex-direction:column;gap:12px">
+      <p style="margin:0"><b>Connect with your existing Uptime Kuma login.</b></p>
+      <div class="two">
+        <label class="f">Username<input type="text" id="lUser" autocomplete="username"></label>
+        <label class="f">Password<input type="password" id="lPass" autocomplete="current-password"></label>
+      </div>
+      <label style="display:flex;gap:8px;font-size:14px"><input type="checkbox" id="lRemember" checked><span>Remember on the server for automatic syncing</span></label>
+      <div><button type="submit" class="btn primary" id="lGo">Connect and sync</button></div>
+    </form>
+
+    <!-- Connected -->
+    <div class="kpanel" id="kumaConnected" hidden style="display:none;flex-direction:column;gap:12px">
+      <div id="kumaMissing"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button type="button" class="btn primary" id="cSync">Sync sites now</button>
+        <button type="button" class="btn danger" id="cForget">Forget saved login</button>
+      </div>
+      <p style="margin:0;color:var(--muted);font-size:14px">New sites you add are sent to Uptime Kuma automatically.</p>
+    </div>
+
+    <div class="result" id="kumaResult" hidden></div>
+    <details>
+      <summary>Prefer to do it by hand?</summary>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
+        <div><b>1. In Kuma</b> (<a id="kumaLink" target="_blank" rel="noopener" href="#">open Uptime Kuma</a>): Settings → Notifications → Setup Notification → type <b>Webhook</b>, body <b>application/json</b>, tick Default enabled and Apply on all existing monitors. URL:</div>
+        <pre class="code" id="hookUrl"></pre>
+        <div><b>2. Add monitors</b> with the exact site name, interval 30, retries 1, or run the bulk script:</div>
+        <pre class="code" id="kumaCmd"></pre>
+      </div>
+    </details>
+  </div>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = (iso) => iso ? new Date(iso).toLocaleString('en-IN', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) : '–';
+const fmtDay = (iso) => new Date(iso).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' });
+const secs = (n) => n == null ? '–' : n < 90 ? `${n} s` : `${(n/60).toFixed(1)} min`;
+const SSL_WARN = 14, DOMAIN_WARN = 30;
+const enc = encodeURIComponent;
+
+let DATA = null, FILTER = 'all';
+const expanded = new Set();
+const busy = new Set();
+
+function toast(msg){ const t=$('toast'); t.textContent=msg; t.style.display='block'; clearTimeout(t._h); t._h=setTimeout(()=>t.style.display='none',4000); }
+async function api(method, url, body){
+  const r = await fetch(url, { method, headers: body ? {'content-type':'application/json'} : {}, body: body ? JSON.stringify(body) : undefined });
+  let j = null; try { j = await r.json(); } catch {}
+  if (r.status === 401) { location.href = '/login'; throw new Error('Signed out'); }
+  if (!r.ok) { const e = new Error((j?.errors || [j?.error || `HTTP ${r.status}`]).join('; ')); e.errors = j?.errors || [j?.error || `HTTP ${r.status}`]; throw e; }
+  return j;
+}
+
+/* ---------- cells ---------- */
+function daysCell(obj, warn){
+  if (!obj) return '<span class="pill none">Not checked</span>';
+  if (obj.days == null) return `<span class="pill warning">Unknown</span><small title="${esc(obj.error)}">${esc(obj.error)}</small>`;
+  const cls = obj.days < 0 || obj.error ? 'critical' : obj.days <= warn ? 'warning' : 'ok';
+  return `<span class="pill ${cls}">${obj.days < 0 ? 'Expired' : obj.days + ' days'}</span><small>${obj.expires ? 'until ' + fmtDay(obj.expires) : ''}</small>`;
+}
+function uptimeCell(s){
+  const u = s.uptime;
+  if (!u) return '<span class="pill none">No events</span>';
+  return u.status === 'down' ? `<span class="pill critical">Down</span><small>since ${fmt(u.since)}</small>` : `<span class="pill ok">Up</span><small>since ${fmt(u.since)}</small>`;
+}
+function indexCell(i){
+  if (!i) return '<span class="pill none">Not checked</span>';
+  if (i.error) return '<span class="pill critical">Unreachable</span>';
+  if (i.noindex) return `<span class="pill critical">noindex</span><small>${esc(i.noindexSource)}</small>`;
+  if (i.robotsBlocked) return '<span class="pill critical">Blocked</span><small>robots.txt</small>';
+  return '<span class="pill ok">Indexable</span>';
+}
+function formCell(s){
+  const f = s.form;
+  if (!s.form_config) return '<span class="pill none">Not set up</span>';
+  if (!f || f.skipped) return '<span class="pill none">Not checked</span>';
+  if (f.ok) return `<span class="pill ok">Working</span><small>${f.mode === 'submit' ? 'test submitted' : 'form present'}</small>`;
+  return '<span class="pill critical">Broken</span>';
+}
+function stripHtml(h, cls){
+  return `<div class="${cls}" role="img" aria-label="${esc(stripLabel(h))}">${h.map(c => `<i class="${c.status}" title="${esc(c.date)}: ${esc(c.status === 'none' ? 'no data' : c.status + (c.issues.length ? ' – ' + c.issues.join('; ') : ''))}"></i>`).join('')}</div>`;
+}
+function stripLabel(h){
+  const n = (k) => h.filter(c => c.status === k).length;
+  return `Last 30 days: ${n('ok')} ok, ${n('warning')} warning, ${n('critical')} critical, ${n('none')} no data`;
+}
+
+/* ---------- render ---------- */
+function statusOf(s){ return s.uptime?.status === 'down' ? 'critical' : s.status; }
+function render(d){
+  DATA = d;
+  $('oncall').textContent = d.onCall?.name || 'Nobody assigned';
+  $('teamsBanner').hidden = d.teamsConfigured;
+  const active = d.sites.filter(s => s.active);
+  const down = active.filter(s => s.uptime?.status === 'down');
+  const crit = active.filter(s => statusOf(s) === 'critical');
+  const warn = active.filter(s => statusOf(s) === 'warning');
+  const v = $('verdict');
+  v.className = 'verdict ' + (crit.length ? 'critical' : warn.length ? 'warning' : 'ok');
+  let headline;
+  if (!d.sites.length) headline = 'No sites yet. Add your first client site.';
+  else if (down.length) headline = `${down.length} ${down.length === 1 ? 'site is' : 'sites are'} down right now.`;
+  else if (crit.length + warn.length) headline = `${crit.length + warn.length} of ${active.length} sites need attention.`;
+  else headline = `All ${active.length} client sites are healthy.`;
+  v.querySelector('h1').textContent = headline;
+  v.querySelector('p').textContent = d.running ? 'Daily checks are running now…'
+    : d.lastRun ? `Daily checks last ran ${fmt(d.lastRun.at)} and took ${d.lastRun.seconds} s. Next run is scheduled for 09:00 IST.` : 'Daily checks have not run yet.';
+
+  const m = d.metrics;
+  $('metrics').innerHTML = `
+    <div class="metric"><strong>${m.avgUptimePct == null ? '–' : m.avgUptimePct + '%'}</strong><span>Average uptime, 30 days</span></div>
+    <div class="metric"><strong>${m.outages30d}</strong><span>Outages caught, 30 days</span></div>
+    <div class="metric"><strong>${secs(m.avgWorstCaseSeconds)}</strong><span>Average outage to alert</span></div>
+    <div class="metric"><strong>${m.expiredNow}</strong><span>Expired SSL or domains now</span></div>
+    <div class="metric"><strong>${m.undelivered30d}</strong><span>Alerts that failed to reach Teams</span></div>`;
+
+  renderSites();
+
+  $('alerts').innerHTML = d.alerts.length ? d.alerts.map(a => `
+    <li>
+      <time datetime="${esc(a.detectedAt)}">${fmt(a.detectedAt)}</time>
+      <span><b class="${a.type}">${a.type === 'down' ? 'Went down' : 'Came back'}</b> ${esc(a.site)}${a.reason ? ` <span style="color:var(--muted)">${esc(a.reason)}</span>` : ''}${a.downtimeMin ? ` <span style="color:var(--muted)">after ${a.downtimeMin} min</span>` : ''}</span>
+      <span class="speed">${a.delivered ? `Teams in ${secs(a.pipelineSeconds)}${a.deliveredTo?.length ? ' to ' + esc(a.deliveredTo.join(', ')) : ''}` : a.skipped ? 'No destination matched' : 'Not delivered'}${a.onCall ? `, ${esc(a.onCall)}` : ''}</span>
+    </li>`).join('') : '<li class="none">No outages yet. When Uptime Kuma sees a site go down, it shows up here.</li>';
+
+  $('runBtn').disabled = d.running;
+  $('runBtn').textContent = d.running ? 'Running checks…' : 'Run all checks';
+}
+
+const respMs = (s) => s.avgPingMs ?? s.avgResponseMs;
+function factsHtml(s){
+  const rows = [];
+  if (s.indexing?.responseMs != null) rows.push(['Homepage load time', `${s.indexing.responseMs} ms today${s.avgResponseMs != null ? `, ${s.avgResponseMs} ms average` : ''}`]);
+  if (s.avgPingMs != null) rows.push(['Uptime Kuma average response', `${s.avgPingMs} ms`]);
+  if (s.uptime24Pct != null) rows.push(['Uptime, last 24 hours', `${s.uptime24Pct}%`]);
+  rows.push(['Uptime, last 30 days', s.uptimePct == null ? 'No data yet' : `${s.uptimePct}% (${s.uptimeSource === 'kuma' ? 'from Uptime Kuma' : 'from outage alerts'})`]);
+  if (s.https && !s.https.skipped) rows.push(['http:// goes to https://', s.https.ok ? 'Yes' : s.https.ok === false ? 'No, fix this' : 'Could not tell']);
+  if (s.sitemap) rows.push(['sitemap.xml', s.sitemap.found ? 'Found' : 'Missing (helps Google find pages)']);
+  if (s.domainExpiry?.stale) rows.push(['Domain expiry', 'Last known date. Today\'s lookup failed, will retry tomorrow.']);
+  return `<dl style="margin:12px 0 0;display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:13px">${rows.map(([k, v]) => `<dt style="color:var(--muted)">${esc(k)}</dt><dd style="margin:0">${esc(v)}</dd>`).join('')}</dl>`;
+}
+
+function renderSites(){
+  const d = DATA; if (!d) return;
+  let list = d.sites;
+  if (FILTER === 'attention') list = list.filter(s => s.active && ['warning','critical'].includes(statusOf(s)));
+  if (FILTER === 'paused') list = list.filter(s => !s.active);
+  if (!list.length) {
+    $('sites').innerHTML = d.sites.length
+      ? `<div class="empty"><h3>Nothing here</h3>No sites match this filter.</div>`
+      : `<div class="empty"><h3>Add your first client site</h3>Enter the site's name and homepage URL. The watchdog then checks SSL, domain expiry, indexing and its contact form every morning.<div style="margin-top:14px"><button class="btn primary" data-act="add">Add site</button></div></div>`;
+    return;
+  }
+  $('sites').innerHTML = list.map(s => {
+    const st = statusOf(s);
+    const open = expanded.has(s.name);
+    const isBusy = busy.has(s.name);
+    const n = enc(s.name);
+    return `
+    <article class="site ${s.active ? st : 'paused'}" data-name="${esc(s.name)}">
+      <div class="row">
+        <div class="name"><button aria-expanded="${open}" data-act="toggle" title="Show details">${esc(s.name)}</button><small>${esc(s.client || s.url)}${s.active ? '' : ' · paused'}</small></div>
+        <div class="strip-wrap">${stripHtml(s.history, 'strip')}<div class="stripcap"><span>30 days ago</span><span>Today</span></div></div>
+        <div class="pctcell"><span class="colhead">Uptime</span>${s.uptimePct == null ? '<span class="pill none">No data</span>' : `<span class="pct">${s.uptimePct}%</span>`}${respMs(s) != null ? `<small style="display:block;color:var(--muted);font-size:12px">avg ${respMs(s)} ms</small>` : ''}</div>
+        <div class="cell"><span class="colhead">Status</span>${s.active ? uptimeCell(s) : '<span class="pill paused">Paused</span>'}</div>
+        <div class="cell"><span class="colhead">SSL</span>${daysCell(s.ssl, SSL_WARN)}</div>
+        <div class="cell"><span class="colhead">Domain</span>${daysCell(s.domainExpiry, DOMAIN_WARN)}</div>
+        <div class="cell"><span class="colhead">Indexing and form</span>${indexCell(s.indexing)} ${formCell(s)}</div>
+        <div class="rowact"><button class="btn small" data-act="check" ${isBusy || !s.active ? 'disabled' : ''}>${isBusy ? 'Checking…' : 'Check now'}</button></div>
+      </div>
+      ${s.active && s.noKumaEvents ? `<div class="nokuma-row">No uptime events yet. Check this site is added in Uptime Kuma with the exact same name.</div>` : ''}
+      ${open ? detailHtml(s) : ''}
+    </article>`;
+  }).join('');
+}
+
+function detailHtml(s){
+  return `
+  <div class="detail">
+    <div>
+      <h4>What needs fixing</h4>
+      ${s.active ? (s.issues?.length ? `<ul>${s.issues.map(i => `<li>${esc(i.text)}</li>`).join('')}</ul>` : `<div class="muted">${s.checkedAt ? 'Nothing. All daily checks passed.' : 'No daily check has run for this site yet.'}</div>`) : '<div class="muted">Paused sites are skipped by daily checks and Kuma sync.</div>'}
+      <div class="muted" style="margin-top:8px">${s.checkedAt ? `Last checked ${fmt(s.checkedAt)}` : ''}${s.domain ? ` · domain ${esc(s.domain)}` : ''}${s.ssl?.issuer ? ` · SSL by ${esc(s.ssl.issuer)}` : ''}${s.domainExpiry?.source ? ` · expiry via ${esc(s.domainExpiry.source)}` : ''}</div>
+      ${factsHtml(s)}
+      <div class="btnrow">
+        <button class="btn small" data-act="edit">Edit site</button>
+        <button class="btn small" data-act="pause">${s.active ? 'Pause monitoring' : 'Resume monitoring'}</button>
+        <a class="btn small" href="${esc(s.url)}" target="_blank" rel="noopener">Open site</a>
+        <button class="btn small danger" data-act="delete">Delete</button>
+      </div>
+    </div>
+    <div>
+      <h4>Daily results, last 30 days</h4>
+      ${stripHtml(s.history, 'dates')}
+      <div class="stripcap"><span>${fmtDay(s.history[0].date)}</span><span>Today</span></div>
+      <div class="muted" style="margin-top:8px">${stripLabel(s.history).replace('Last 30 days: ', '')}</div>
+    </div>
+  </div>`;
+}
+
+/* ---------- list actions ---------- */
+$('sites').addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-act]'); if (!btn) return;
+  if (btn.dataset.act === 'add') return openSite(null);
+  const card = btn.closest('.site'); const name = card.dataset.name;
+  const site = DATA.sites.find(s => s.name === name);
+  switch (btn.dataset.act) {
+    case 'toggle': expanded.has(name) ? expanded.delete(name) : expanded.add(name); renderSites(); break;
+    case 'edit': openSite(site); break;
+    case 'check':
+      busy.add(name); renderSites();
+      try { await api('POST', `/api/sites/${enc(name)}/check`); toast(`Checked ${name}.`); }
+      catch (err) { toast(`Check failed: ${err.message}`); }
+      busy.delete(name); await load(); break;
+    case 'pause':
+      try { await api('POST', `/api/sites/${enc(name)}/active`, { active: !site.active }); toast(site.active ? `Paused ${name}.` : `Resumed ${name}.`); }
+      catch (err) { toast(err.message); }
+      await load(); break;
+    case 'delete':
+      if (!confirm(`Delete "${name}"? Its history is removed too. A backup of the config is kept.`)) return;
+      try { await api('DELETE', `/api/sites/${enc(name)}`); expanded.delete(name); toast(`Deleted ${name}.`); }
+      catch (err) { toast(err.message); }
+      await load(); break;
+  }
+});
+document.querySelectorAll('.chip').forEach(c => c.onclick = () => {
+  FILTER = c.dataset.f;
+  document.querySelectorAll('.chip').forEach(x => x.setAttribute('aria-pressed', x === c));
+  renderSites();
+});
+
+/* ---------- dialogs: generic ---------- */
+document.addEventListener('click', (e) => { if (e.target.closest('[data-close]')) e.target.closest('dialog').close(); });
+document.querySelectorAll('dialog').forEach(dlg => dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); }));
+const showErrors = (el, errs) => { el.hidden = !errs?.length; el.innerHTML = errs?.length ? `<ul>${errs.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''; };
+
+/* ---------- site editor ---------- */
+let editing = null; // original name or null for new
+const mode = () => document.querySelector('input[name=fMode]:checked').value;
+
+function kvRow(k = '', v = ''){
+  const r = document.createElement('div'); r.className = 'kvrow';
+  r.innerHTML = `<input type="text" placeholder="Field name" aria-label="Field name" value="${esc(k)}"><input type="text" placeholder="Value" aria-label="Field value" value="${esc(v)}"><button type="button" class="btn small" aria-label="Remove field">Remove</button>`;
+  r.querySelector('button').onclick = () => r.remove();
+  return r;
+}
+function syncMode(){
+  const m = mode();
+  $('formFields').hidden = m === 'none';
+  $('submitOnly').style.display = m === 'submit' ? 'flex' : 'none';
+  $('fFormUrlHelp').textContent = m === 'submit' ? 'The address the form posts to (for Contact Form 7: /wp-json/contact-form-7/v1/contact-forms/ID/feedback).' : 'The page that should contain the form, for example the contact page.';
+  $('fExpectHelp').textContent = m === 'submit' ? 'Must appear in the response, for example mail_sent.' : 'Must appear on the page. Leave empty to look for a <form> tag.';
+  if (m === 'submit' && !$('kv').children.length) $('kv').appendChild(kvRow());
+  $('formResult').hidden = true;
+}
+document.querySelectorAll('input[name=fMode]').forEach(r => r.onchange = syncMode);
+$('addKv').onclick = () => $('kv').appendChild(kvRow());
+
+function openSite(site){
+  editing = site ? site.name : null;
+  $('siteTitle').textContent = site ? `Edit ${site.name}` : 'Add site';
+  showErrors($('siteErrors'), []);
+  $('fName').value = site?.name || ''; $('fClient').value = site?.client || ''; $('fUrl').value = site?.url || '';
+  $('fDomain').value = site?.domainCustom || '';
+  const f = site?.form_config;
+  document.querySelector(`input[name=fMode][value=${f?.mode || 'none'}]`).checked = true;
+  $('fFormUrl').value = f?.url || ''; $('fExpectText').value = f?.expectText || '';
+  $('fExpectStatus').value = f?.expectStatus || 200; $('fType').value = f?.type || 'urlencoded';
+  $('kv').innerHTML = ''; Object.entries(f?.fields || {}).forEach(([k, v]) => $('kv').appendChild(kvRow(k, v)));
+  if (f?.mode === 'submit' && !Object.keys(f.fields || {}).length) $('kv').appendChild(kvRow());
+  syncMode();
+  $('siteDlg').showModal(); $('fName').focus();
+}
+
+function collectSite(){
+  const m = mode();
+  const out = { name: $('fName').value, client: $('fClient').value, url: $('fUrl').value };
+  if ($('fDomain').value.trim()) out.domain = $('fDomain').value;
+  if (m !== 'none') {
+    out.form = { mode: m, url: $('fFormUrl').value, expectText: $('fExpectText').value || undefined };
+    if (m === 'submit') {
+      out.form.method = 'POST'; out.form.type = $('fType').value; out.form.expectStatus = Number($('fExpectStatus').value || 200);
+      out.form.fields = {};
+      $('kv').querySelectorAll('.kvrow').forEach(r => { const [k, v] = r.querySelectorAll('input'); if (k.value.trim()) out.form.fields[k.value.trim()] = v.value; });
+    }
+  }
+  return out;
+}
+
+$('siteForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const body = collectSite();
+  $('saveSite').disabled = true;
+  try {
+    if (editing) await api('PUT', `/api/sites/${enc(editing)}`, body); else await api('POST', '/api/sites', body);
+    $('siteDlg').close(); toast(editing ? `Saved ${body.name}.` : `Added ${body.name}. Run a check to fill in its results.`);
+    if (editing && editing !== body.name && expanded.delete(editing)) expanded.add(body.name);
+    await load();
+  } catch (err) { showErrors($('siteErrors'), err.errors); $('siteErrors').scrollIntoView({block:'nearest'}); }
+  $('saveSite').disabled = false;
+});
+
+$('testFormBtn').onclick = async () => {
+  const body = collectSite(); const out = $('formResult');
+  if (!editing) { // new site: test needs a saved site, so validate then ask to save first
+    out.hidden = false; out.className = 'result bad'; out.textContent = 'Save the site first, then edit it to test the form.'; return;
+  }
+  out.hidden = false; out.className = 'result'; out.textContent = 'Testing the form…'; $('testFormBtn').disabled = true;
+  try {
+    const r = await api('POST', `/api/sites/${enc(editing)}/test-form`, { form: body.form });
+    if (r.skipped) { out.className = 'result'; out.textContent = 'No form check is set up.'; }
+    else if (r.ok) { out.className = 'result ok'; out.textContent = `Form works (HTTP ${r.httpStatus}).`; }
+    else { out.className = 'result bad'; out.textContent = `Form failed: ${r.error || 'unknown error'}${r.httpStatus ? ` (HTTP ${r.httpStatus})` : ''}`; }
+  } catch (err) { out.className = 'result bad'; out.textContent = err.message; }
+  $('testFormBtn').disabled = false;
+};
+$('addBtn').onclick = () => openSite(null);
+
+/* ---------- on-call ---------- */
+async function loadRota(){
+  const { list, current } = await api('GET', '/api/oncall');
+  $('rota').innerHTML = list.length ? list.map((p, i) => `
+    <li class="${current && p.name === current.name && p.from === current.from ? 'now' : ''}">
+      <span><b>${esc(p.name)}</b>${current && p.name === current.name && p.from === current.from ? ' (on call now)' : ''}<br><small>${p.from || 'Any time'} to ${p.to || 'open-ended'}${p.upn ? ' · ' + esc(p.upn) : ' · no Teams email, so no @mention'}</small></span>
+      <button class="btn small danger" data-rm="${i}">Remove</button>
+    </li>`).join('') : '<li><small>Nobody on the rota. Alerts will say "Nobody assigned".</small></li>';
+}
+$('rota').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-rm]'); if (!b) return;
+  try { await api('DELETE', `/api/oncall/${b.dataset.rm}`); await loadRota(); await load(); } catch (err) { toast(err.message); }
+});
+$('ocForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try {
+    await api('POST', '/api/oncall', { name: $('ocName').value, upn: $('ocUpn').value, from: $('ocFrom').value, to: $('ocTo').value });
+    $('ocForm').reset(); showErrors($('ocErrors'), []); await loadRota(); await load(); toast('Added to the rota.');
+  } catch (err) { showErrors($('ocErrors'), err.errors); }
+});
+async function loadRecips(){
+  const list = await api('GET', '/api/recipients');
+  $('recips').innerHTML = list.length ? list.map((p, i) => `<li><span><b>${esc(p.name)}</b><br><small>${esc(p.upn)}</small></span><button class="btn small danger" data-rc="${i}">Remove</button></li>`).join('') : '<li><small>Nobody yet. Only the person on call is mentioned.</small></li>';
+}
+$('recips').addEventListener('click', async (e) => { const b = e.target.closest('[data-rc]'); if (!b) return; try { await api('DELETE', `/api/recipients/${b.dataset.rc}`); await loadRecips(); } catch (err) { toast(err.message); } });
+$('rcForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try { await api('POST', '/api/recipients', { name: $('rcName').value, upn: $('rcUpn').value }); $('rcForm').reset(); showErrors($('rcErrors'), []); await loadRecips(); toast('Recipient added. They are @mentioned on every alert.'); }
+  catch (err) { showErrors($('rcErrors'), err.errors); }
+});
+/* ---------- Teams destinations ---------- */
+let DESTS = [];
+let editingDest = null;
+const EV = { down: 'Outages', up: 'Recoveries', daily: 'Daily summary', notice: 'Kuma notices' };
+const destSummary = (d) => [d.kind === 'group' ? 'Group chat' : 'Personal chat', Object.keys(EV).filter(k => d.events[k]).map(k => EV[k]).join(', '),
+  d.scope === 'all' ? 'All sites' : `${d.sites.length} site${d.sites.length === 1 ? '' : 's'}`, d.onCallOnly ? `Only while ${d.onCallOnly} is on call` : 'Always'].join(' · ');
+
+async function loadDests(){
+  DESTS = await api('GET', '/api/destinations');
+  $('dests').innerHTML = DESTS.length ? DESTS.map(d => `
+    <div class="dest ${d.enabled ? '' : 'off'}" data-id="${esc(d.id)}">
+      <div style="min-width:0;flex:1 1 260px"><b>${esc(d.name)}</b> <span class="pill ${d.enabled ? 'ok' : 'none'}">${d.enabled ? 'On' : 'Off'}</span>
+        <div style="color:var(--muted);font-size:13px">${esc(destSummary(d))}</div>
+        <div style="color:var(--muted);font-size:12px">Link saved, ends ${esc(d.hint)}</div></div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <label class="chk" style="align-items:center"><input type="checkbox" data-toggle ${d.enabled ? 'checked' : ''} style="margin:0">On</label>
+        <button type="button" class="btn small" data-test>Test</button>
+        <button type="button" class="btn small" data-edit>Edit</button>
+      </div>
+    </div>`).join('') : '<div class="empty" style="padding:18px"><b style="color:var(--ink)">No destinations yet.</b><br>Add one to start receiving alerts in Teams.</div>';
+}
+$('dests').addEventListener('click', async (e) => {
+  const card = e.target.closest('.dest'); if (!card) return;
+  const d = DESTS.find(x => x.id === card.dataset.id);
+  if (e.target.closest('[data-edit]')) return openDest(d);
+  if (e.target.closest('[data-test]')) {
+    if (!confirm(`Send one test message to "${d.name}"?`)) return;
+    try { await api('POST', `/api/destinations/${enc(d.id)}/test`); toast(`Test message sent to ${d.name}. Check Teams.`); } catch (err) { toast(`Test failed: ${err.message}`); }
+  }
+  if (e.target.matches('[data-toggle]')) {
+    try { await api('PUT', `/api/destinations/${enc(d.id)}`, { enabled: e.target.checked }); toast(`${d.name} is now ${e.target.checked ? 'on' : 'off'}.`); } catch (err) { toast(err.message); }
+    await loadDests(); await load();
+  }
+});
+
+const dScope = () => document.querySelector('input[name=dScope]:checked').value;
+function syncScope(){ $('dSites').style.display = dScope() === 'sites' ? 'flex' : 'none'; }
+document.querySelectorAll('input[name=dScope]').forEach(r => r.onchange = syncScope);
+function syncKind(){ $('dLinkHelp').textContent = $('dKind').value === 'group' ? 'From a workflow that posts to a group chat.' : 'From a workflow that posts to one person\'s own chat.'; }
+$('dKind').onchange = () => { syncKind(); if (!editingDest) $('dMention').checked = $('dKind').value === 'group'; };
+
+async function openDest(d){
+  editingDest = d || null;
+  showErrors($('destErrors'), []);
+  $('destTitle').textContent = d ? `Edit ${d.name}` : 'Add destination';
+  $('dName').value = d?.name || ''; $('dKind').value = d?.kind || 'group'; $('dUrl').value = '';
+  syncKind();
+  $('dLinkHelp').textContent += d ? ` A link is saved (ends ${d.hint}). Paste a new one only to replace it.` : ' Paste it here. It stays on the server and is never shown again.';
+  const ev = d?.events || { down: true, up: true, daily: true, notice: true };
+  $('evDown').checked = ev.down; $('evUp').checked = ev.up; $('evDaily').checked = ev.daily; $('evNotice').checked = ev.notice;
+  document.querySelector(`input[name=dScope][value=${d?.scope || 'all'}]`).checked = true;
+  $('dSites').innerHTML = (DATA?.sites || []).map(s => `<label class="chk"><input type="checkbox" value="${esc(s.name)}" ${d?.sites?.includes(s.name) ? 'checked' : ''}> ${esc(s.name)}</label>`).join('') || '<small>No sites yet.</small>';
+  syncScope();
+  let people = []; try { people = (await api('GET', '/api/oncall')).list.map(p => p.name); } catch {}
+  const names = [...new Set([...people, ...(d?.onCallOnly ? [d.onCallOnly] : [])])];
+  $('dOnCall').innerHTML = '<option value="">Always, whoever is on call</option>' + names.map(n => `<option value="${esc(n)}">Only while ${esc(n)} is on call</option>`).join('');
+  $('dOnCall').value = d?.onCallOnly || '';
+  $('dMention').checked = d ? d.mention : true;
+  $('dDelete').hidden = !d; $('dTest').hidden = !d;
+  $('destDlg').showModal(); $('dName').focus();
+}
+$('addDest').onclick = () => openDest(null);
+$('setupTeams').onclick = () => openOnCall();
+
+$('destForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const body = {
+    name: $('dName').value, kind: $('dKind').value, events: { down: $('evDown').checked, up: $('evUp').checked, daily: $('evDaily').checked, notice: $('evNotice').checked },
+    scope: dScope(), sites: [...$('dSites').querySelectorAll('input:checked')].map(i => i.value), onCallOnly: $('dOnCall').value, mention: $('dMention').checked,
+  };
+  if ($('dUrl').value.trim()) body.url = $('dUrl').value;
+  $('dSave').disabled = true;
+  try {
+    if (editingDest) await api('PUT', `/api/destinations/${enc(editingDest.id)}`, body); else await api('POST', '/api/destinations', { ...body, enabled: true });
+    $('destDlg').close(); toast(editingDest ? 'Destination saved.' : 'Destination added. Use Test to check it.');
+    await loadDests(); await load();
+  } catch (err) { showErrors($('destErrors'), err.errors); $('destErrors').scrollIntoView({ block: 'nearest' }); }
+  $('dSave').disabled = false;
+});
+$('dTest').onclick = async () => {
+  if (!editingDest || !confirm(`Send one test message to "${editingDest.name}"?`)) return;
+  $('dTest').disabled = true;
+  try { await api('POST', `/api/destinations/${enc(editingDest.id)}/test`); toast('Test message sent. Check Teams.'); } catch (err) { showErrors($('destErrors'), [`Test failed: ${err.message}`]); }
+  $('dTest').disabled = false;
+};
+$('dDelete').onclick = async () => {
+  if (!editingDest || !confirm(`Delete "${editingDest.name}"? Alerts will stop going there.`)) return;
+  try { await api('DELETE', `/api/destinations/${enc(editingDest.id)}`); $('destDlg').close(); toast('Destination deleted.'); await loadDests(); await load(); } catch (err) { toast(err.message); }
+};
+
+
+const openOnCall = async () => { showErrors($('ocErrors'), []); showErrors($('rcErrors'), []); await Promise.all([loadRota(), loadRecips(), loadDests()]); $('ocDlg').showModal(); };
+$('oncallBtn').textContent = 'Alerts and on-call'; $('oncallBtn').onclick = openOnCall; $('oncall2').onclick = openOnCall;
+
+/* ---------- eye button on every password field ---------- */
+const EYE = '<svg class="on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><svg class="off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.9 10.9 0 0 1 12 19c-6.5 0-10-7-10-7a18.5 18.5 0 0 1 5.06-5.94M9.9 4.24A9.1 9.1 0 0 1 12 4c6.5 0 10 7 10 7a18.5 18.5 0 0 1-2.16 3.19M14.12 14.12A3 3 0 1 1 9.88 9.88"/><path d="M1 1l22 22"/></svg>';
+function addEye(input){
+  const wrap = document.createElement('span'); wrap.className = 'pwrap';
+  input.parentNode.insertBefore(wrap, input); wrap.appendChild(input);
+  const b = document.createElement('button'); b.type = 'button'; b.className = 'eye'; b.innerHTML = EYE;
+  const sync = () => { const shown = input.type !== 'password'; b.setAttribute('aria-pressed', shown); b.setAttribute('aria-label', shown ? 'Hide password' : 'Show password'); };
+  b.onclick = () => { input.type = input.type === 'password' ? 'text' : 'password'; sync(); };
+  input.addEventListener('eyesync', sync); sync(); wrap.appendChild(b);
+}
+document.querySelectorAll('input[type=password]').forEach(addEye);
+
+/* ---------- Kuma ---------- */
+let KSTATE = null;
+const kShow = (id) => ['kumaSetup','kumaLogin','kumaConnected'].forEach(x => { const el = $(x); const on = x === id; el.hidden = !on; el.style.display = on ? 'flex' : 'none'; });
+const genPassword = () => { const c = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'; const a = new Uint32Array(16); crypto.getRandomValues(a); return Array.from(a, n => c[n % c.length]).join('') + 'a7'; };
+const strength = (p) => !p ? '' : p.length < 8 || !/[A-Za-z]/.test(p) || !/\d/.test(p) ? 'Too weak for Kuma' : p.length >= 14 ? 'Strong' : 'OK';
+
+async function refreshKuma(){
+  $('kumaState').className = 'result'; $('kumaState').textContent = 'Checking Uptime Kuma…';
+  try { KSTATE = await api('GET', '/api/kuma/status'); } catch (e) { KSTATE = { reachable: false, error: e.message }; }
+  const st = $('kumaState');
+  if (!KSTATE.reachable) { st.className = 'result bad'; st.textContent = `Uptime Kuma is not reachable. Start it with "docker compose up -d", then reopen this window. (${KSTATE.error || ''})`; ['kumaSetup','kumaLogin','kumaConnected'].forEach(x => { $(x).hidden = true; $(x).style.display = 'none'; }); }
+  else if (KSTATE.needSetup) { st.className = 'result'; st.textContent = 'Uptime Kuma is running but has no account yet. Create one below.'; kShow('kumaSetup'); }
+  else if (KSTATE.connected) { st.className = 'result ok'; st.textContent = `Connected to Uptime Kuma as "${KSTATE.user}".`; kShow('kumaConnected'); }
+  else { st.className = 'result'; st.textContent = 'Uptime Kuma has an account. Log in once to connect.'; kShow('kumaLogin'); }
+  const missing = (DATA?.sites || []).filter(s => s.active && s.noKumaEvents);
+  $('kumaMissing').innerHTML = missing.length ? `<div class="errors" style="background:var(--warn-bg);border-color:var(--warn)">No uptime events yet for: <b>${missing.map(s => esc(s.name)).join(', ')}</b>. Sync adds them to Kuma.</div>` : '';
+  $('kumaBtn').textContent = KSTATE.connected ? 'Uptime Kuma: connected' : 'Connect Uptime Kuma';
+}
+$('kumaBtn').onclick = async () => {
+  $('kumaResult').hidden = true;
+  try { const i = await api('GET', '/api/kuma/info'); $('hookUrl').textContent = i.hookUrl; $('kumaCmd').textContent = i.command; $('kumaLink').href = i.uiUrl; } catch {}
+  $('kumaDlg').showModal(); await refreshKuma();
+};
+function showSync(r){
+  const out = $('kumaResult'); out.hidden = false; out.className = r.failed.length ? 'result bad' : 'result ok';
+  out.innerHTML = [...r.log.map(esc), `Added ${r.added.length}: ${r.added.map(esc).join(', ') || 'none'}`, `Already there: ${r.skipped.length}`, ...r.failed.map(f => `Failed: ${esc(f.name)} (${esc(f.error)})`)].join('<br>');
+}
+async function kumaCall(btn, url, body){
+  const out = $('kumaResult'); btn.disabled = true; out.hidden = false; out.className = 'result'; out.textContent = 'Working with Uptime Kuma…';
+  try { showSync(await api('POST', url, body)); await load(); await refreshKuma(); }
+  catch (err) { out.className = 'result bad'; out.textContent = err.message + ' You can follow the manual steps below instead.'; out.closest('dialog').querySelector('details').open = true; }
+  btn.disabled = false;
+}
+$('sGen').onclick = () => { $('sPass').value = genPassword(); $('sPass').type = 'text'; $('sPass').dispatchEvent(new Event('eyesync')); $('sStrength').textContent = 'Strong. Copy it before you continue.'; };
+$('sCopy').onclick = async () => { try { await navigator.clipboard.writeText($('sPass').value); toast('Password copied.'); } catch { toast('Could not copy. Select the password and copy it by hand.'); } };
+$('sPass').oninput = () => $('sStrength').textContent = strength($('sPass').value);
+$('kumaSetup').addEventListener('submit', (e) => { e.preventDefault(); kumaCall($('sGo'), '/api/kuma/setup', { user: $('sUser').value, pass: $('sPass').value, remember: $('sRemember').checked }); });
+$('kumaLogin').addEventListener('submit', (e) => { e.preventDefault(); kumaCall($('lGo'), '/api/kuma/sync', { user: $('lUser').value, pass: $('lPass').value, remember: $('lRemember').checked }); });
+$('cSync').onclick = () => kumaCall($('cSync'), '/api/kuma/sync', {});
+$('cForget').onclick = async () => { if (!confirm('Forget the saved Uptime Kuma login? New sites will no longer sync automatically.')) return; await api('DELETE', '/api/kuma/credentials'); toast('Saved login removed.'); await refreshKuma(); };
+
+/* ---------- top actions ---------- */
+$('runBtn').onclick = async () => {
+  $('runBtn').disabled = true; $('runBtn').textContent = 'Running checks…';
+  try { await api('POST', '/api/run'); toast('Checks started. Results fill in as they finish.'); } catch (err) { toast(err.message); }
+  poll();
+};
+$('testBtn').onclick = async () => {
+  let list = []; try { list = (await api('GET', '/api/destinations')).filter(d => d.enabled); } catch {}
+  if (!list.length) { toast('No destination is switched on. Open Alerts and on-call to add one.'); return openOnCall(); }
+  if (!confirm(`Send one test message to: ${list.map(d => d.name).join(', ')}?`)) return;
+  $('testBtn').disabled = true;
+  try { await api('POST', '/api/test-alert', {}); toast('Test message sent. Check Teams.'); }
+  catch (err) { toast(`Test failed: ${err.message}`); }
+  $('testBtn').disabled = false;
+};
+
+$('helpBtn').onclick = () => $('helpDlg').showModal();
+$('logoutBtn').onclick = async () => { await fetch('/api/logout', { method: 'POST' }); location.href = '/login'; };
+
+/* ---------- loading ---------- */
+async function load(){
+  try { render(await api('GET', '/api/status')); }
+  catch (e) { toast('Could not load status. Check that the watchdog is running.'); }
+}
+async function poll(){ for (let i = 0; i < 40; i++) { await new Promise(r => setTimeout(r, 3000)); await load(); if (!DATA.running) break; } }
+load();
+// Live updates: the server pushes a ping whenever data changes; polling stays as a slow safety net.
+let stale = false;
+const refreshIfIdle = () => { if (document.querySelector('dialog[open]')) { stale = true; } else { stale = false; load(); } };
+try { new EventSource('/api/events').addEventListener('change', refreshIfIdle); } catch {}
+document.querySelectorAll('dialog').forEach(d => d.addEventListener('close', () => { if (stale) refreshIfIdle(); }));
+setInterval(refreshIfIdle, 60000);
+fetch('/api/kuma/status').then(r => r.json()).then(s => { $('kumaBtn').textContent = s.connected ? 'Uptime Kuma: connected' : 'Connect Uptime Kuma'; }).catch(() => {});
+</script>
+</body>
+</html>
